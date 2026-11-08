@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Body Explorer — Interactive 3D Human Anatomy</title>
+  <meta name="description" content="Explore the human body in 3D. Click any bone, muscle, organ, vessel or nerve to learn its name and what it does." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/",
+      "three-mesh-bvh": "https://cdn.jsdelivr.net/npm/three-mesh-bvh@0.8.3/build/index.module.js"
+    }
+  }
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <button class="icon-btn only-mobile" id="btnMenu" aria-label="Open body systems">
+      <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+    </button>
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="6" r="4"/><path d="M16 11v11M9 14l7 2 7-2M12 30l4-8 4 8"/></svg>
+      <span>Body<b>Explorer</b></span>
+    </div>
+    <nav class="modes" role="tablist">
+      <button class="mode active" data-mode="explore" role="tab">Explore</button>
+      <button class="mode" data-mode="quiz" role="tab">Quiz</button>
+    </nav>
+    <div class="search-wrap">
+      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+      <input id="search" type="search" placeholder="Search 3,000+ parts… (e.g. femur, heart)" autocomplete="off" />
+      <ul id="searchResults" class="search-results" hidden></ul>
+    </div>
+  </header>
+
+  <aside class="sidebar" id="sidebar">
+    <div class="side-head">
+      <h2>Body systems</h2>
+      <button class="icon-btn only-mobile" id="btnCloseSide" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <p class="hint">Turn systems on, ghost them to see inside, or expand to toggle regions.</p>
+    <ul id="systemList" class="system-list"></ul>
+    <div class="side-foot">
+      Model: <a href="https://www.z-anatomy.com" target="_blank" rel="noopener">Z-Anatomy</a> (CC BY-SA 4.0), derived from BodyParts3D. Descriptions adapted from Z-Anatomy / Wikipedia (CC BY-SA).
+    </div>
+  </aside>
+
+  <main class="stage" id="stage">
+    <canvas id="viewer"></canvas>
+    <div id="tooltip" class="tooltip" hidden></div>
+
+    <div class="loading" id="loading">
+      <div class="bar"><span id="loadBar"></span></div>
+      <p id="loadText">Loading model…</p>
+    </div>
+
+    <div class="toolbar" role="toolbar">
+      <button class="tool" id="btnReset" title="Reset view"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 3-6.2M4 4v4h4"/></svg><span>Reset</span></button>
+      <div class="tool-group">
+        <button class="tool" data-view="front" title="Front view"><span>Front</span></button>
+        <button class="tool" data-view="back" title="Back view"><span>Back</span></button>
+        <button class="tool" data-view="left" title="Left side"><span>Left</span></button>
+        <button class="tool" data-view="right" title="Right side"><span>Right</span></button>
+      </div>
+      <button class="tool" id="btnShowAll" title="Unhide all hidden parts"><svg viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><span>Unhide all</span></button>
+      <label class="tool slider" title="Pull parts apart">
+        <svg viewBox="0 0 24 24"><path d="M12 3v6M12 15v6M3 12h6M15 12h6M9 9l-3-3M15 9l3-3M9 15l-3 3M15 15l3 3"/></svg>
+        <span>Explode</span>
+        <input type="range" id="explode" min="0" max="1" step="0.01" value="0" />
+      </label>
+      <button class="tool" id="btnRotate" title="Auto-rotate"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7M21 4v5h-5"/></svg><span>Spin</span></button>
+    </div>
+
+    <div class="quiz-bar" id="quizBar" hidden>
+      <div class="quiz-q">Find: <b id="quizTarget">—</b></div>
+      <div class="quiz-score">Score <b id="quizScore">0</b> / <b id="quizTotal">0</b></div>
+      <button class="btn small" id="quizSkip">Skip</button>
+      <button class="btn small ghost" id="quizHint">Hint</button>
+    </div>
+  </main>
+
+  <aside class="info" id="info" hidden>
+    <button class="icon-btn info-close" id="btnCloseInfo" aria-label="Close details"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <div class="chip-row"><span class="chip" id="infoSystem"></span><span class="chip muted" id="infoGroup"></span></div>
+    <h1 id="infoName"></h1>
+    <p class="side-label" id="infoSide"></p>
+    <section class="fn">
+      <h3>What it does</h3>
+      <p id="infoFunction"></p>
+    </section>
+    <section id="infoDescWrap">
+      <h3>Description</h3>
+      <p id="infoDesc" class="desc"></p>
+    </section>
+    <div class="actions">
+      <button class="btn" id="btnFocus">Zoom to</button>
+      <button class="btn" id="btnIsolate">Isolate</button>
+      <button class="btn ghost" id="btnHide">Hide</button>
+    </div>
+    <section class="related" id="relatedWrap">
+      <h3>Nearby in this group</h3>
+      <ul id="related"></ul>
+    </section>
+  </aside>
+
+  <div class="welcome" id="welcome">
+    <div class="welcome-card">
+      <h2>Explore the human body in 3D</h2>
+      <ul>
+        <li><b>Drag</b> to rotate · <b>scroll / pinch</b> to zoom · <b>right-drag</b> to pan</li>
+        <li><b>Click</b> any part to see its name and what it does</li>
+        <li>Turn on <b>organs, vessels and nerves</b> in the left panel; <b>ghost</b> the outer layers to see inside</li>
+        <li>Ready to test yourself? Switch to <b>Quiz</b> mode</li>
+      </ul>
+      <button class="btn primary" id="btnStart">Start exploring</button>
+    </div>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
